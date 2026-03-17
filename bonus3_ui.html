@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arvyax — Emotional Intelligence Demo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         background: #f0f4f8; color: #1a202c; min-height: 100vh; }
+  .container { max-width: 760px; margin: 0 auto; padding: 32px 20px; }
+  h1 { font-size: 24px; font-weight: 600; color: #2d3748; margin-bottom: 4px; }
+  .subtitle { color: #718096; font-size: 14px; margin-bottom: 28px; }
+  .card { background: white; border-radius: 12px; padding: 24px;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 20px; }
+  .card h2 { font-size: 14px; font-weight: 600; color: #4a5568;
+             text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; }
+  label { display: block; font-size: 13px; color: #4a5568;
+          font-weight: 500; margin-bottom: 6px; margin-top: 14px; }
+  label:first-of-type { margin-top: 0; }
+  textarea, select, input[type=range], input[type=number] {
+    width: 100%; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 10px 12px; font-size: 14px; color: #2d3748;
+    background: #f7fafc; outline: none; transition: border 0.15s; }
+  textarea:focus, select:focus { border-color: #667eea; background: white; }
+  textarea { resize: vertical; min-height: 100px; font-family: inherit; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .slider-row { display: flex; align-items: center; gap: 10px; }
+  .slider-row input[type=range] { flex: 1; padding: 0; }
+  .slider-val { font-size: 15px; font-weight: 600; color: #667eea;
+                min-width: 22px; text-align: right; }
+  button { width: 100%; padding: 14px; background: #667eea; color: white;
+           border: none; border-radius: 10px; font-size: 15px; font-weight: 600;
+           cursor: pointer; margin-top: 20px; transition: background 0.15s; }
+  button:hover { background: #5a67d8; }
+  button:disabled { background: #a0aec0; cursor: not-allowed; }
+  .result-card { background: white; border-radius: 12px; padding: 24px;
+                 box-shadow: 0 1px 4px rgba(0,0,0,0.08); display: none; }
+  .result-card.visible { display: block; }
+  .badge { display: inline-block; padding: 4px 12px; border-radius: 20px;
+           font-size: 12px; font-weight: 600; margin-left: 8px; }
+  .badge.confident  { background: #c6f6d5; color: #276749; }
+  .badge.borderline { background: #fefcbf; color: #744210; }
+  .badge.uncertain  { background: #fed7d7; color: #742a2a; }
+  .state-row { display: flex; align-items: center; margin-bottom: 16px; }
+  .state-name { font-size: 22px; font-weight: 700; color: #2d3748; }
+  .conf-bar-wrap { background: #edf2f7; border-radius: 99px;
+                   height: 8px; flex: 1; margin: 0 12px; overflow: hidden; }
+  .conf-bar { height: 100%; border-radius: 99px; background: #667eea;
+              transition: width 0.5s ease; }
+  .action-box { background: #ebf8ff; border: 1px solid #bee3f8;
+                border-radius: 10px; padding: 16px; margin: 16px 0; }
+  .action-label { font-size: 12px; font-weight: 600; color: #2c5282;
+                  text-transform: uppercase; letter-spacing: 0.05em; }
+  .action-value { font-size: 20px; font-weight: 700; color: #1a365d; margin: 4px 0; }
+  .timing-chip { display: inline-block; background: #e9d8fd; color: #44337a;
+                 padding: 4px 14px; border-radius: 20px; font-size: 13px;
+                 font-weight: 600; }
+  .message-box { background: #fffff0; border-left: 4px solid #d69e2e;
+                 border-radius: 0 8px 8px 0; padding: 14px 16px; margin-top: 16px;
+                 font-size: 14px; line-height: 1.6; color: #744210; font-style: italic; }
+  .meta-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+  .meta-pill { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+               padding: 6px 12px; font-size: 12px; color: #4a5568; }
+  .meta-pill span { font-weight: 600; color: #2d3748; }
+  .error-box { background: #fff5f5; border: 1px solid #feb2b2; border-radius: 8px;
+               padding: 14px; color: #c53030; font-size: 13px; display: none; }
+  .spinner { display: none; text-align: center; padding: 20px; color: #718096; }
+  .api-note { font-size: 12px; color: #a0aec0; margin-top: 8px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Arvyax Emotional Intelligence</h1>
+  <p class="subtitle">Predict your emotional state and get a personalised action recommendation</p>
+
+  <div class="card">
+    <h2>Journal Entry</h2>
+    <textarea id="journal" placeholder="Write your journal entry here... (e.g. 'The forest ambience helped me feel calmer, but my mind kept drifting to tomorrow.')"></textarea>
+  </div>
+
+  <div class="card">
+    <h2>Context</h2>
+    <div class="row">
+      <div>
+        <label>Ambience type</label>
+        <select id="ambience">
+          <option value="ocean">Ocean</option>
+          <option value="forest" selected>Forest</option>
+          <option value="mountain">Mountain</option>
+          <option value="rain">Rain</option>
+          <option value="cafe">Cafe</option>
+        </select>
+      </div>
+      <div>
+        <label>Time of day</label>
+        <select id="time_of_day">
+          <option value="early_morning">Early morning</option>
+          <option value="morning">Morning</option>
+          <option value="afternoon" selected>Afternoon</option>
+          <option value="evening">Evening</option>
+          <option value="night">Night</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Previous day mood</label>
+        <select id="prev_mood">
+          <option value="calm">Calm</option>
+          <option value="focused">Focused</option>
+          <option value="neutral" selected>Neutral</option>
+          <option value="mixed">Mixed</option>
+          <option value="restless">Restless</option>
+          <option value="overwhelmed">Overwhelmed</option>
+        </select>
+      </div>
+      <div>
+        <label>Reflection quality</label>
+        <select id="reflection">
+          <option value="clear" selected>Clear</option>
+          <option value="vague">Vague</option>
+          <option value="conflicted">Conflicted</option>
+        </select>
+      </div>
+    </div>
+    <div class="row3">
+      <div>
+        <label>Energy level</label>
+        <div class="slider-row">
+          <input type="range" id="energy" min="1" max="5" value="3"
+                 oninput="document.getElementById('energy_val').textContent=this.value">
+          <span class="slider-val" id="energy_val">3</span>
+        </div>
+      </div>
+      <div>
+        <label>Stress level</label>
+        <div class="slider-row">
+          <input type="range" id="stress" min="1" max="5" value="3"
+                 oninput="document.getElementById('stress_val').textContent=this.value">
+          <span class="slider-val" id="stress_val">3</span>
+        </div>
+      </div>
+      <div>
+        <label>Sleep hours</label>
+        <div class="slider-row">
+          <input type="range" id="sleep" min="3" max="9" step="0.5" value="7"
+                 oninput="document.getElementById('sleep_val').textContent=this.value">
+          <span class="slider-val" id="sleep_val">7</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="error-box" id="error_box"></div>
+  <button id="predict_btn" onclick="runPrediction()">Analyse my state</button>
+  <p class="api-note">Connects to FastAPI backend at localhost:8000</p>
+
+  <div class="spinner" id="spinner">Analysing your entry...</div>
+
+  <div class="result-card" id="result_card">
+    <div class="state-row">
+      <div class="state-name" id="res_state"></div>
+      <div class="conf-bar-wrap">
+        <div class="conf-bar" id="res_conf_bar"></div>
+      </div>
+      <span id="res_conf_pct" style="font-size:13px;color:#718096;"></span>
+      <span class="badge" id="res_flag"></span>
+    </div>
+
+    <div class="action-box">
+      <div class="action-label">Recommended action</div>
+      <div class="action-value" id="res_action"></div>
+      <span class="timing-chip" id="res_timing"></span>
+    </div>
+
+    <div class="message-box" id="res_message"></div>
+
+    <div class="meta-row">
+      <div class="meta-pill">Intensity <span id="res_intensity"></span></div>
+      <div class="meta-pill">Source <span id="res_intensity_src"></span></div>
+      <div class="meta-pill">Latency <span id="res_latency"></span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = "http://localhost:8000";
+
+async function runPrediction() {
+  const journal = document.getElementById("journal").value.trim();
+  if (!journal) {
+    showError("Please write a journal entry before analysing.");
+    return;
+  }
+
+  document.getElementById("error_box").style.display = "none";
+  document.getElementById("predict_btn").disabled = true;
+  document.getElementById("spinner").style.display = "block";
+  document.getElementById("result_card").classList.remove("visible");
+
+  const payload = {
+    journal_text:       journal,
+    ambience_type:      document.getElementById("ambience").value,
+    time_of_day:        document.getElementById("time_of_day").value,
+    previous_day_mood:  document.getElementById("prev_mood").value,
+    reflection_quality: document.getElementById("reflection").value,
+    energy_level:       parseInt(document.getElementById("energy").value),
+    stress_level:       parseInt(document.getElementById("stress").value),
+    sleep_hours:        parseFloat(document.getElementById("sleep").value),
+    duration_min:       20
+  };
+
+  try {
+    const res = await fetch(`${API}/predict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      showError(`API error: ${err.detail || res.statusText}`);
+      return;
+    }
+
+    const data = await res.json();
+    renderResult(data);
+
+  } catch (e) {
+    showError(
+      "Could not connect to the API. Make sure the FastAPI server is running:\n" +
+      "  uvicorn bonus2_api:app --reload --port 8000"
+    );
+  } finally {
+    document.getElementById("predict_btn").disabled = false;
+    document.getElementById("spinner").style.display = "none";
+  }
+}
+
+function renderResult(d) {
+  document.getElementById("res_state").textContent =
+    d.emotional_state.charAt(0).toUpperCase() + d.emotional_state.slice(1);
+
+  const confPct = Math.round(d.emotion_confidence * 100);
+  document.getElementById("res_conf_bar").style.width = confPct + "%";
+  document.getElementById("res_conf_pct").textContent = confPct + "%";
+
+  const flag = document.getElementById("res_flag");
+  flag.textContent = d.uncertainty_flag;
+  flag.className = "badge " + d.uncertainty_flag;
+
+  document.getElementById("res_action").textContent =
+    d.action.replace(/_/g, " ");
+  document.getElementById("res_timing").textContent =
+    d.timing.replace(/_/g, " ");
+  document.getElementById("res_message").textContent = d.supportive_message;
+  document.getElementById("res_intensity").textContent =
+    d.intensity_predicted.toFixed(1);
+  document.getElementById("res_intensity_src").textContent =
+    d.intensity_source;
+  document.getElementById("res_latency").textContent =
+    d.latency_ms + " ms";
+
+  document.getElementById("result_card").classList.add("visible");
+  document.getElementById("result_card").scrollIntoView({ behavior: "smooth" });
+}
+
+function showError(msg) {
+  const box = document.getElementById("error_box");
+  box.textContent = msg;
+  box.style.display = "block";
+  document.getElementById("predict_btn").disabled = false;
+  document.getElementById("spinner").style.display = "none";
+}
+
+document.getElementById("journal").addEventListener("keydown", e => {
+  if (e.ctrlKey && e.key === "Enter") runPrediction();
+});
+</script>
+</body>
+</html>
