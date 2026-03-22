@@ -166,10 +166,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 @app.on_event("startup")
 async def startup():
-    load_models()
+    import asyncio
+    asyncio.create_task(load_models_async())
+
+async def load_models_async():
+    import asyncio
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, load_models)
+
 
 
 # ── Schemas ───────────────────────────────────────────────────
