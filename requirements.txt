@@ -6,6 +6,6 @@ sentence-transformers==3.0.0
 tensorflow-cpu==2.20.0
 scikit-learn==1.5.2
 numpy==1.26.4
-pandas==2.2.2
+pandas==2.3.0
 huggingface-hub==0.23.2
 accelerate>=1.1.0
