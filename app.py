@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 import numpy as np
 import pandas as pd
-import os, time, io, json
+import os, time, io, json, zipfile, tempfile, shutil
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
@@ -22,23 +22,72 @@ _embedder = None
 _le       = None
 _ohe      = None
 _scaler   = None
+_cat_cols = None
 
-HF_REPO   = os.getenv("HF_REPO", "YOUR_HF_USERNAME/arvyax-models")
+HF_REPO   = os.getenv("HF_REPO", "ymanoj7745/arvyax-models")
 HF_TOKEN  = os.getenv("HF_TOKEN", "")   # set in Railway env vars
 
+def strip_quantization_config(value):
+    if isinstance(value, dict):
+        cleaned = {}
+        for key, item in value.items():
+            if key == "quantization_config" and item is None:
+                continue
+            cleaned[key] = strip_quantization_config(item)
+        return cleaned
+    if isinstance(value, list):
+        return [strip_quantization_config(item) for item in value]
+    return value
+
+def sanitize_keras_archive(model_path):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with zipfile.ZipFile(model_path, "r") as src:
+            src.extractall(tmpdir)
+
+        config_path = os.path.join(tmpdir, "config.json")
+        if os.path.exists(config_path):
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+            cleaned = strip_quantization_config(config)
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(cleaned, f)
+
+        sanitized_path = os.path.join(tempfile.gettempdir(), "best_model_v5_sanitized.keras")
+        if os.path.exists(sanitized_path):
+            os.remove(sanitized_path)
+        shutil.make_archive(sanitized_path[:-6], "zip", tmpdir)
+        if os.path.exists(sanitized_path):
+            os.remove(sanitized_path)
+        os.replace(sanitized_path[:-6] + ".zip", sanitized_path)
+        return sanitized_path
+
+def encode_categories(cat_vals):
+    encoded = []
+    for value, col in zip(cat_vals, _cat_cols):
+        categories = _ohe[col]
+        row = [0.0] * len(categories)
+        if value in categories:
+            row[categories.index(value)] = 1.0
+        encoded.extend(row)
+    return np.array([encoded], dtype=np.float32)
+
+def scale_numeric(num_vals):
+    arr = np.array(num_vals, dtype=np.float32)
+    means = np.array(_scaler["mean"], dtype=np.float32)
+    scales = np.array(_scaler["scale"], dtype=np.float32)
+    safe_scales = np.where(scales == 0, 1.0, scales)
+    return ((arr - means) / safe_scales).astype(np.float32)
+
 def load_models():
-    global _model, _embedder, _le, _ohe, _scaler
+    global _model, _embedder, _le, _ohe, _scaler, _cat_cols
 
     if _model is not None:
         return
 
     import tensorflow as tf
-    from tensorflow import keras
-    from sklearn.preprocessing import LabelEncoder, StandardScaler, OneHotEncoder
-    from sklearn.impute import SimpleImputer
+    import keras
     from sentence_transformers import SentenceTransformer
     from huggingface_hub import hf_hub_download, snapshot_download
-    import pickle
 
     print("Downloading models from Hugging Face Hub ...")
 
@@ -49,7 +98,8 @@ def load_models():
         token     = HF_TOKEN or None,
         local_dir = "/tmp/models"
     )
-    _model = keras.models.load_model(model_path)
+    sanitized_model_path = sanitize_keras_archive(model_path)
+    _model = keras.models.load_model(sanitized_model_path, compile=False)
     print("TF model loaded.")
 
     # Download fine-tuned sentence transformer
@@ -59,22 +109,29 @@ def load_models():
         local_dir = "/tmp/embedder",
         ignore_patterns=["*.keras", "*.pkl", "*.csv"]
     )
-    _embedder = SentenceTransformer("/tmp/embedder/finetuned_embedder_v5")
+    embedder_path = os.path.join(embedder_dir, "finetuned_embedder_v5")
+    if not os.path.exists(embedder_path):
+        embedder_path = embedder_dir
+    _embedder = SentenceTransformer(embedder_path)
     print("Embedder loaded.")
 
-    # Download preprocessor pickle
+    # Download preprocessing metadata
     prep_path = hf_hub_download(
         repo_id   = HF_REPO,
-        filename  = "preprocessors.pkl",
+        filename  = "preprocessors.json",
         token     = HF_TOKEN or None,
         local_dir = "/tmp/models"
     )
-    with open(prep_path, "rb") as f:
-        prep = pickle.load(f)
+    with open(prep_path, "r", encoding="utf-8") as f:
+        prep = json.load(f)
 
-    _le     = prep["le"]
-    _ohe    = prep["ohe"]
-    _scaler = prep["scaler"]
+    _le = prep["label_classes"]
+    _ohe = prep["ohe_categories"]
+    _scaler = {
+        "mean": prep["scaler_mean"],
+        "scale": prep["scaler_scale"],
+    }
+    _cat_cols = prep["categorical_columns"]
     print("Preprocessors loaded. System ready.")
 
 
@@ -207,17 +264,15 @@ class PredictionResult(BaseModel):
 
 # ── Feature builder ───────────────────────────────────────────
 def build_features(req: PredictRequest):
-    CAT_COLS = ["ambience_type","time_of_day","previous_day_mood",
-                "face_emotion_hint","reflection_quality"]
-    cat_vals = [[req.ambience_type or "unknown", req.time_of_day or "unknown",
-                 req.previous_day_mood or "unknown", req.face_emotion_hint or "unknown",
-                 req.reflection_quality or "unknown"]]
+    cat_vals = [req.ambience_type or "unknown", req.time_of_day or "unknown",
+                req.previous_day_mood or "unknown", req.face_emotion_hint or "unknown",
+                req.reflection_quality or "unknown"]
     num_vals = [[req.duration_min or 20.0, req.sleep_hours or 7.0,
                  req.energy_level or 3, req.stress_level or 3,
                  req.intensity or 3]]
     emb = _embedder.encode([req.journal_text], normalize_embeddings=True)
-    cat = _ohe.transform(cat_vals)
-    num = _scaler.transform(num_vals)
+    cat = encode_categories(cat_vals)
+    num = scale_numeric(num_vals)
     return np.hstack([emb, cat, num]).astype(np.float32)
 
 def get_uncertainty(proba):
@@ -237,7 +292,7 @@ def health():
 @app.get("/classes")
 def get_classes():
     return {
-        "emotional_states": list(_le.classes_) if _le else [],
+        "emotional_states": list(_le) if _le else [],
         "actions": ["box_breathing","journaling","grounding","deep_work","yoga",
                     "sound_therapy","light_planning","rest","movement","pause"],
         "timings": ["now","within_15_min","later_today","tonight","tomorrow_morning"]
@@ -253,7 +308,7 @@ def predict(req: PredictRequest):
     X          = build_features(req)
     proba      = _model.predict(X, verbose=0)[0]
     pred_idx   = int(np.argmax(proba))
-    pred_state = _le.inverse_transform([pred_idx])[0]
+    pred_state = _le[pred_idx]
     conf       = float(np.max(proba))
     unc_flag   = get_uncertainty(proba)
 
