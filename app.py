@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Optional
+from threading import Lock
 import numpy as np
 import pandas as pd
 import os, time, io, json, zipfile, tempfile, shutil
@@ -23,6 +24,7 @@ _le       = None
 _ohe      = None
 _scaler   = None
 _cat_cols = None
+_model_lock = Lock()
 
 HF_REPO   = os.getenv("HF_REPO", "ymanoj7745/arvyax-models")
 HF_TOKEN  = os.getenv("HF_TOKEN", "")   # set in Railway env vars
@@ -133,6 +135,13 @@ def load_models():
     }
     _cat_cols = prep["categorical_columns"]
     print("Preprocessors loaded. System ready.")
+
+def ensure_models_loaded():
+    if _model is not None:
+        return
+    with _model_lock:
+        if _model is None:
+            load_models()
 
 
 # ── Decision engine ───────────────────────────────────────────
@@ -287,10 +296,15 @@ def get_uncertainty(proba):
 # ── Endpoints ─────────────────────────────────────────────────
 @app.get("/health")
 def health():
-    return {"status": "ok", "models_loaded": _model is not None}
+    return {
+        "status": "ok",
+        "models_loaded": _model is not None,
+        "hf_repo": HF_REPO,
+    }
 
 @app.get("/classes")
 def get_classes():
+    ensure_models_loaded()
     return {
         "emotional_states": list(_le) if _le else [],
         "actions": ["box_breathing","journaling","grounding","deep_work","yoga",
@@ -300,8 +314,9 @@ def get_classes():
 
 @app.post("/predict", response_model=PredictionResult)
 def predict(req: PredictRequest):
+    ensure_models_loaded()
     if _model is None:
-        raise HTTPException(503, "Models not loaded yet")
+        raise HTTPException(503, "Models failed to load")
     t0 = time.time()
 
     word_count = len(req.journal_text.split())
