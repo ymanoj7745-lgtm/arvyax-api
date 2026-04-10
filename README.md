@@ -5,12 +5,13 @@
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.21-FF6F00?style=for-the-badge&logo=tensorflow&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-badge&logo=fastapi&logoColor=white)
-![HuggingFace](https://img.shields.io/badge/🤗_HuggingFace-Spaces-FFD21E?style=for-the-badge)
+![HuggingFace](https://img.shields.io/badge/🤗_HuggingFace-Model%20Hub-FFD21E?style=for-the-badge)
+![Render](https://img.shields.io/badge/Render-Web%20Service-46E3B7?style=for-the-badge&logo=render&logoColor=black)
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-1.5.2-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white)
 
 **Predict emotional states from journal entries · Get personalized action recommendations · Deploy anywhere**
 
-[🚀 Live Demo](https://ymanoj7745-arvyax-api.hf.space) · [📖 API Docs](https://ymanoj7745-arvyax-api.hf.space/docs) · [🤗 Models](https://huggingface.co/ymanoj7745/arvyax-models) · [📊 Dataset](https://huggingface.co/datasets)
+[🚀 Live Demo](https://arvyax-api-ibfu.onrender.com) · [📖 API Docs](https://arvyax-api-ibfu.onrender.com/docs) · [🤗 Models](https://huggingface.co/ymanoj7745/arvyax-models) · [📊 Dataset](https://huggingface.co/datasets)
 
 </div>
 
@@ -43,7 +44,7 @@ Arvyax is an **end-to-end Emotional Intelligence system** that reads a user's jo
 | 🧹 **Label Noise Handling** | Confident learning (Bonus 1) |
 | 🌐 **REST API** | FastAPI with Swagger UI |
 | 🎨 **Interactive UI** | Beautiful single-page journaling interface |
-| 🚀 **Production Ready** | Deployed on HF Spaces via Docker |
+| 🚀 **Production Ready** | Publicly deployed on Render with model assets on Hugging Face |
 
 ---
 
@@ -277,9 +278,9 @@ arvyax-api/
 ├── 📖 ERROR_ANALYSIS.md                 # 10 failure cases + insights
 ├── 📖 EDGE_PLAN.md                      # Deployment + optimization plan
 │
-├── 🐳 Dockerfile                        # HF Spaces deployment
+├── 🐳 Dockerfile                        # Container deployment
 ├── 📋 requirements.txt                  # Dependencies
-└── 📋 Procfile                          # Railway deployment
+└── 📋 Procfile                          # Process startup config
 ```
 
 ---
@@ -301,24 +302,24 @@ arvyax-api/
 
 ## 🌐 Deployment
 
-The app is deployed on **Hugging Face Spaces** using Docker:
+The public app is deployed on **Render**, while model artifacts are hosted on **Hugging Face Hub**:
 
 ```
 User Request
     ↓
-HF Spaces (FastAPI container, port 7860)
+Render Web Service (FastAPI app)
     ↓
-Download models from HF Hub on startup
-    ├── best_model_v5.keras      (6.2 MB)
-    ├── finetuned_embedder_v5/   (420 MB)
-    └── preprocessors.pkl        (2.2 KB)
+Download models from HF Hub on startup / first load
+    ├── best_model_v5.keras
+    ├── finetuned_embedder_v5/
+    └── preprocessors.json
     ↓
 Serve predictions + UI
 ```
 
 **Live URLs:**
-- App: https://ymanoj7745-arvyax-api.hf.space
-- API: https://ymanoj7745-arvyax-api.hf.space/docs
+- App: https://arvyax-api-ibfu.onrender.com
+- API: https://arvyax-api-ibfu.onrender.com/docs
 - Models: https://huggingface.co/ymanoj7745/arvyax-models
 
 ---
@@ -342,6 +343,6 @@ Serve predictions + UI
 
 <div align="center">
 
-Made with ❤️ · Powered by 🤗 HuggingFace · Built with ⚡ FastAPI
+Made with ❤️ · Powered by Hugging Face Hub · Built with FastAPI
 
 </div>
